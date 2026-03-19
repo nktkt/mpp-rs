@@ -76,12 +76,20 @@ pub fn extract_payment_scheme(header: &str) -> Option<&str> {
 /// Escape a string for use in a quoted-string header value.
 /// Rejects CRLF to prevent header injection attacks.
 fn escape_quoted_value(s: &str) -> Result<String> {
-    if s.contains('\r') || s.contains('\n') {
-        return Err(MppError::invalid_challenge_reason(
-            "Header value contains invalid CRLF characters",
-        ));
+    let mut result = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\r' | '\n' => {
+                return Err(MppError::invalid_challenge_reason(
+                    "Header value contains invalid CRLF characters",
+                ));
+            }
+            '\\' => result.push_str("\\\\"),
+            '"' => result.push_str("\\\""),
+            _ => result.push(c),
+        }
     }
-    Ok(s.replace('\\', "\\\\").replace('"', "\\\""))
+    Ok(result)
 }
 
 /// Header name for payment challenges (from server)
@@ -312,44 +320,48 @@ pub fn parse_www_authenticate_all<'a>(
 /// assert!(header.starts_with("Payment id=\"abc123\""));
 /// ```
 pub fn format_www_authenticate(challenge: &PaymentChallenge) -> Result<String> {
+    use std::fmt::Write;
+
     // Escape all quoted values to prevent header injection
-    let mut parts = vec![
-        format!("id=\"{}\"", escape_quoted_value(&challenge.id)?),
-        format!("realm=\"{}\"", escape_quoted_value(&challenge.realm)?),
-        format!(
-            "method=\"{}\"",
-            escape_quoted_value(challenge.method.as_str())?
-        ),
-        format!(
-            "intent=\"{}\"",
-            escape_quoted_value(challenge.intent.as_str())?
-        ),
-        format!(
-            "request=\"{}\"",
-            escape_quoted_value(challenge.request.raw())?
-        ),
-    ];
+    let mut header = String::with_capacity(256);
+    write!(
+        header,
+        "Payment id=\"{}\", realm=\"{}\", method=\"{}\", intent=\"{}\", request=\"{}\"",
+        escape_quoted_value(&challenge.id)?,
+        escape_quoted_value(&challenge.realm)?,
+        escape_quoted_value(challenge.method.as_str())?,
+        escape_quoted_value(challenge.intent.as_str())?,
+        escape_quoted_value(challenge.request.raw())?,
+    )
+    .unwrap();
 
     if let Some(ref expires) = challenge.expires {
-        parts.push(format!("expires=\"{}\"", escape_quoted_value(expires)?));
+        write!(header, ", expires=\"{}\"", escape_quoted_value(expires)?).unwrap();
     }
 
     if let Some(ref description) = challenge.description {
-        parts.push(format!(
-            "description=\"{}\"",
+        write!(
+            header,
+            ", description=\"{}\"",
             escape_quoted_value(description)?
-        ));
+        )
+        .unwrap();
     }
 
     if let Some(ref digest) = challenge.digest {
-        parts.push(format!("digest=\"{}\"", escape_quoted_value(digest)?));
+        write!(header, ", digest=\"{}\"", escape_quoted_value(digest)?).unwrap();
     }
 
     if let Some(ref opaque) = challenge.opaque {
-        parts.push(format!("opaque=\"{}\"", escape_quoted_value(opaque.raw())?));
+        write!(
+            header,
+            ", opaque=\"{}\"",
+            escape_quoted_value(opaque.raw())?
+        )
+        .unwrap();
     }
 
-    Ok(format!("Payment {}", parts.join(", ")))
+    Ok(header)
 }
 
 /// Format multiple challenges as WWW-Authenticate header values.

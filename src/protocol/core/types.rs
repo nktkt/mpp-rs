@@ -316,7 +316,7 @@ impl fmt::Display for PaymentProtocol {
 /// Indicates what kind of data is in the payload. Per spec:
 /// - `transaction`: Signed blockchain transaction (to be broadcast by server)
 /// - `hash`: Transaction hash (already broadcast by client)
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PayloadType {
     /// Signed blockchain transaction (to be broadcast by server)
@@ -335,7 +335,7 @@ impl fmt::Display for PayloadType {
 }
 
 /// Payment receipt status.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ReceiptStatus {
     /// Payment succeeded

@@ -35,8 +35,23 @@ pub fn compute_json<T: serde::Serialize>(body: &T) -> BodyDigest {
 }
 
 /// Verifies that a digest matches the given body bytes.
+///
+/// Uses constant-time comparison to prevent timing side-channel attacks.
 pub fn verify(digest: &str, body: &[u8]) -> bool {
-    compute(body) == digest
+    let computed = compute(body);
+    constant_time_eq(computed.as_bytes(), digest.as_bytes())
+}
+
+/// Constant-time byte comparison to prevent timing attacks.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut result = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        result |= x ^ y;
+    }
+    result == 0
 }
 
 #[cfg(test)]

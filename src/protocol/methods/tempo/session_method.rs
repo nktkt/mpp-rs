@@ -106,9 +106,15 @@ pub async fn deduct_from_channel(
                     .ok_or_else(|| VerificationError::channel_not_found("channel not found"))?;
                 let available = state.highest_voucher_amount.saturating_sub(state.spent);
                 if available >= amount {
+                    let new_spent = state.spent.checked_add(amount).ok_or_else(|| {
+                        VerificationError::new("spent counter overflow")
+                    })?;
+                    let new_units = state.units.checked_add(1).ok_or_else(|| {
+                        VerificationError::new("units counter overflow")
+                    })?;
                     Ok(Some(ChannelState {
-                        spent: state.spent + amount,
-                        units: state.units + 1,
+                        spent: new_spent,
+                        units: new_units,
                         ..state
                     }))
                 } else {

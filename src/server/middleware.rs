@@ -176,11 +176,8 @@ where
                     // No credential — return 402 with challenge.
                     let challenge = match verifier.challenge() {
                         Ok(c) => c,
-                        Err(e) => {
-                            return Ok(error_response(
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                &format!("Failed to generate challenge: {}", e),
-                            ));
+                        Err(_e) => {
+                            return Ok(error_response(StatusCode::INTERNAL_SERVER_ERROR));
                         }
                     };
                     let mut resp = Response::new(ResBody::default());
@@ -197,11 +194,8 @@ where
             // Verify the credential.
             let receipt_header = match verifier.verify(&credential).await {
                 Ok(r) => r,
-                Err(e) => {
-                    return Ok(error_response(
-                        StatusCode::PAYMENT_REQUIRED,
-                        &format!("Payment verification failed: {}", e),
-                    ));
+                Err(_e) => {
+                    return Ok(error_response(StatusCode::PAYMENT_REQUIRED));
                 }
             };
 
@@ -219,7 +213,7 @@ where
 }
 
 /// Build a minimal error response.
-fn error_response<B: Default>(status: StatusCode, _message: &str) -> Response<B> {
+fn error_response<B: Default>(status: StatusCode) -> Response<B> {
     let mut resp = Response::new(B::default());
     *resp.status_mut() = status;
     resp

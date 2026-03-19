@@ -119,11 +119,13 @@ const HTTP_METHODS: &[&str] = &["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD",
 /// Parse a route pattern like `"POST /v1/chat/completions"` into (method, path).
 fn parse_route_pattern(pattern: &str) -> (Option<String>, String) {
     let tokens: Vec<&str> = pattern.split_whitespace().collect();
-    if tokens.len() >= 2 && HTTP_METHODS.contains(&tokens[0].to_uppercase().as_str()) {
-        (Some(tokens[0].to_uppercase()), tokens[1..].join(" "))
-    } else {
-        (None, pattern.trim().to_string())
+    if tokens.len() >= 2 {
+        let method_upper = tokens[0].to_uppercase();
+        if HTTP_METHODS.contains(&method_upper.as_str()) {
+            return (Some(method_upper), tokens[1..].join(" "));
+        }
     }
+    (None, pattern.trim().to_string())
 }
 
 /// Check if a URL path matches a route pattern path.
@@ -314,16 +316,17 @@ fn serialize_payment(endpoint: &Endpoint) -> Value {
     match endpoint {
         Endpoint::Free => Value::Null,
         Endpoint::Paid(p) => {
-            let mut m = serde_json::Map::new();
-            m.insert("intent".to_string(), json!(p.intent));
-            m.insert("amount".to_string(), json!(p.amount));
+            let mut obj = json!({
+                "intent": p.intent,
+                "amount": p.amount,
+            });
             if let Some(ref ut) = p.unit_type {
-                m.insert("unitType".to_string(), json!(ut));
+                obj["unitType"] = json!(ut);
             }
             if let Some(ref desc) = p.description {
-                m.insert("description".to_string(), json!(desc));
+                obj["description"] = json!(desc);
             }
-            Value::Object(m)
+            obj
         }
     }
 }
@@ -378,7 +381,7 @@ pub fn to_llms_txt(services: &[Service]) -> String {
                     lines.push(format!("- `{}`: Free", route.pattern));
                 }
                 Endpoint::Paid(p) => {
-                    let mut parts = vec![p.intent.clone()];
+                    let mut parts = vec![p.intent.as_str().to_string()];
                     let unit = format!("{} units", p.amount);
                     if let Some(ref ut) = p.unit_type {
                         parts.push(format!("{unit} per {ut}"));

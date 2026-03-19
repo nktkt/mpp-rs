@@ -125,19 +125,39 @@ impl FileStore {
         Ok(Self { dir })
     }
 
-    fn key_path(&self, key: &str) -> std::path::PathBuf {
+    /// Maximum key length to prevent filesystem-level DoS.
+    const MAX_KEY_LENGTH: usize = 512;
+
+    fn key_path(&self, key: &str) -> std::result::Result<std::path::PathBuf, StoreError> {
+        if key.len() > Self::MAX_KEY_LENGTH {
+            return Err(StoreError::Internal(format!(
+                "Key length {} exceeds maximum {}",
+                key.len(),
+                Self::MAX_KEY_LENGTH
+            )));
+        }
+
         // Sanitize key: replace path separators and special chars
         let safe_key: String = key
             .chars()
             .map(|c| {
-                if c.is_alphanumeric() || c == '-' || c == '_' {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
                     c
                 } else {
                     '_'
                 }
             })
             .collect();
-        self.dir.join(format!("{}.json", safe_key))
+        let path = self.dir.join(format!("{}.json", safe_key));
+
+        // Defense-in-depth: verify the resolved path stays within the store directory
+        if !path.starts_with(&self.dir) {
+            return Err(StoreError::Internal(
+                "Key resolved to path outside store directory".to_string(),
+            ));
+        }
+
+        Ok(path)
     }
 }
 
@@ -149,6 +169,7 @@ impl Store for FileStore {
     {
         let path = self.key_path(key);
         Box::pin(async move {
+            let path = path?;
             match std::fs::read_to_string(&path) {
                 Ok(raw) => {
                     let value = serde_json::from_str(&raw)
@@ -168,6 +189,7 @@ impl Store for FileStore {
     ) -> Pin<Box<dyn Future<Output = Result<(), StoreError>> + Send + '_>> {
         let path = self.key_path(key);
         Box::pin(async move {
+            let path = path?;
             let serialized = serde_json::to_string_pretty(&value)
                 .map_err(|e| StoreError::Serialization(e.to_string()))?;
             std::fs::write(&path, serialized).map_err(|e| StoreError::Internal(e.to_string()))?;
@@ -181,6 +203,7 @@ impl Store for FileStore {
     ) -> Pin<Box<dyn Future<Output = Result<(), StoreError>> + Send + '_>> {
         let path = self.key_path(key);
         Box::pin(async move {
+            let path = path?;
             match std::fs::remove_file(&path) {
                 Ok(()) => Ok(()),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),

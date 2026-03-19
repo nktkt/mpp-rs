@@ -270,7 +270,7 @@ where
                         if let Ok(Some(ch)) = store.get_channel(&channel_id).await {
                             let event = format_need_voucher_event(&NeedVoucherEvent {
                                 channel_id: channel_id.clone(),
-                                required_cumulative: (ch.spent + tick_cost).to_string(),
+                                required_cumulative: ch.spent.saturating_add(tick_cost).to_string(),
                                 accepted_cumulative: ch.highest_voucher_amount.to_string(),
                                 deposit: ch.deposit.to_string(),
                             });

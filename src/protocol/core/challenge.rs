@@ -461,16 +461,13 @@ pub fn compute_challenge_id(
     // All fields are always included in the pipe-delimited HMAC input,
     // with empty string for absent optional fields. This ensures challenges
     // with vs without expires/digest/opaque produce different HMACs.
-    let hmac_input = [
-        realm,
-        method,
-        intent,
-        request,
-        expires.unwrap_or(""),
-        digest.unwrap_or(""),
-        opaque.unwrap_or(""),
-    ]
-    .join("|");
+    use std::fmt::Write;
+    let exp = expires.unwrap_or("");
+    let dig = digest.unwrap_or("");
+    let opq = opaque.unwrap_or("");
+    let mut hmac_input =
+        String::with_capacity(realm.len() + method.len() + intent.len() + request.len() + exp.len() + dig.len() + opq.len() + 6);
+    write!(hmac_input, "{}|{}|{}|{}|{}|{}|{}", realm, method, intent, request, exp, dig, opq).unwrap();
 
     let mut mac =
         HmacSha256::new_from_slice(secret_key.as_bytes()).expect("HMAC can take key of any size");
@@ -481,7 +478,7 @@ pub fn compute_challenge_id(
 }
 
 /// Constant-time string comparison to prevent timing attacks.
-fn constant_time_eq(a: &str, b: &str) -> bool {
+pub fn constant_time_eq(a: &str, b: &str) -> bool {
     if a.len() != b.len() {
         return false;
     }
@@ -614,7 +611,7 @@ impl PaymentPayload {
 
     /// Get the payload type.
     pub fn payload_type(&self) -> PayloadType {
-        self.payload_type.clone()
+        self.payload_type
     }
 
     /// Get the underlying data (works for both transaction and hash payloads).
