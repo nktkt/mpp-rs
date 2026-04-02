@@ -17,7 +17,7 @@
 //! from arbitrary memos via `TransferWithMemo` event topic filtering.
 
 use alloy::primitives::keccak256;
-use rand::Rng;
+use rand::RngExt;
 use std::sync::LazyLock;
 
 /// First 4 bytes of keccak256("mpp") — the on-chain MPP tag.

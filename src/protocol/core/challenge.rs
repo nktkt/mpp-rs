@@ -453,7 +453,7 @@ pub fn compute_challenge_id(
     digest: Option<&str>,
     opaque: Option<&str>,
 ) -> String {
-    use hmac::{Hmac, Mac};
+    use hmac::{Hmac, KeyInit, Mac};
     use sha2::Sha256;
 
     type HmacSha256 = Hmac<Sha256>;
@@ -465,9 +465,22 @@ pub fn compute_challenge_id(
     let exp = expires.unwrap_or("");
     let dig = digest.unwrap_or("");
     let opq = opaque.unwrap_or("");
-    let mut hmac_input =
-        String::with_capacity(realm.len() + method.len() + intent.len() + request.len() + exp.len() + dig.len() + opq.len() + 6);
-    write!(hmac_input, "{}|{}|{}|{}|{}|{}|{}", realm, method, intent, request, exp, dig, opq).unwrap();
+    let mut hmac_input = String::with_capacity(
+        realm.len()
+            + method.len()
+            + intent.len()
+            + request.len()
+            + exp.len()
+            + dig.len()
+            + opq.len()
+            + 6,
+    );
+    write!(
+        hmac_input,
+        "{}|{}|{}|{}|{}|{}|{}",
+        realm, method, intent, request, exp, dig, opq
+    )
+    .unwrap();
 
     let mut mac =
         HmacSha256::new_from_slice(secret_key.as_bytes()).expect("HMAC can take key of any size");
